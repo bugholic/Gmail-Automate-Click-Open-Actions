@@ -69,23 +69,58 @@ def scroll_like_human(driver):
 def open_unread_email(driver, wait):
     """Finds and opens the first unread email matching specific keywords."""
     try:
+        keywords = ["Ready"]
+        
         wait.until(EC.presence_of_element_located((By.XPATH, "//table[@role='grid']")))
         unread_emails = driver.find_elements(By.XPATH, "//tr[contains(@class, 'zE')]")
+        
         for email_row in unread_emails:
-            ActionChains(driver).move_to_element(email_row).click().perform()
-            time.sleep(3)
-            # try:
-            #     sender = email_row.find_element(By.XPATH, './/span[@class="bA4"]/span').text
-            #     subject = email_row.find_element(By.XPATH, './/span[@class="bog"]').text
-            #     if any(keyword in sender or keyword in subject for keyword in ["fin"]):
-            #         ActionChains(driver).move_to_element(email_row).click().perform()
-            #         time.sleep(3)
-            #         return
-            # except Exception:
-            #     continue
-    except Exception:
-        print("Error occured")
-        log_encrypted_error(encrypt_message(traceback.format_exc()))
+            try:
+                sender = email_row.find_element(By.XPATH, './/span[@class="bA4"]/span').text.lower()
+                subject = email_row.find_element(By.XPATH, './/span[@class="bog"]').text.lower()
+                
+                print(f"Checking email - From: {sender}, Subject: {subject}")
+                
+                if any(keyword.lower() in sender or keyword.lower() in subject for keyword in keywords):
+                    print(f"Found matching email with keyword - From: {sender}, Subject: {subject}")
+                    ActionChains(driver).move_to_element(email_row).click().perform()
+                    time.sleep(3)
+                    return True
+                else:
+                    print("No keyword match, skipping email")
+            except Exception as e:
+                print(f"Error while checking email: {str(e)}")
+                continue
+        
+        print("No matching emails found, switching to next profile")
+        return False
+        
+    except Exception as e:
+        print(f"Error in open_unread_email: {str(e)}")
+        print(f"Full error details: {traceback.format_exc()}")
+        return False
+
+def main():
+    """Main function to execute the script on all available profiles."""
+    profiles = get_available_profiles()
+    for profile in profiles:
+        if profile == "Guest Profile": return 
+        print(f"Starting automation on profile: {profile}")
+        driver, wait = setup_webdriver(profile)
+        if driver:
+            try:
+                login_gmail(driver, wait)
+                scroll_like_human(driver)
+                if open_unread_email(driver, wait):
+                    click_cta_button(driver, wait)
+                else:
+                    print(f"No matching emails found in profile {profile}, moving to next profile")
+                    continue
+            finally:
+                time.sleep(5)
+                driver.quit()
+        else:
+            print(f"Skipping profile {profile} due to an error.")
 
 def click_cta_button(driver, wait):
     """Finds and clicks a CTA button inside the email."""
@@ -119,26 +154,6 @@ def simulate_browsing(driver):
     except Exception:
         print("Error occured")
         log_encrypted_error(encrypt_message(traceback.format_exc()))    
-
-def main():
-    """Main function to execute the script on all available profiles."""
-    profiles = get_available_profiles()
-    for profile in profiles:
-        if profile == "Guest Profile": return 
-        print(f"Starting automation on profile: {profile}")
-        driver, wait = setup_webdriver(profile)
-        if driver:
-            try:
-                login_gmail(driver, wait)
-                scroll_like_human(driver)
-                open_unread_email(driver, wait)
-                click_cta_button(driver, wait)
-                # simulate_browsing(driver)
-            finally:
-                time.sleep(5)
-                driver.quit()
-        else:
-            print(f"Skipping profile {profile} due to an error.")
 
 if __name__ == "__main__":
     main()
